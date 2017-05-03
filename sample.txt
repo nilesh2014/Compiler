@@ -1,0 +1,15 @@
+struct stud {
+	int a ;
+	char nname;
+	float f,g;
+} new ;
+int main(int c, float test){
+	
+	int a[4][5];
+
+	int i;
+	for (i=0; i < 5; i++){
+		i = i + 9;
+	}
+	return 1;
+}

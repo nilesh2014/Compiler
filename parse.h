@@ -79,19 +79,19 @@ struct nonTstruct{
 };
 
 
-struct codeLineEntry
+struct quadList
 {
     char code[100];
     
     int gotoL;
 
-    struct codeLineEntry *next;
+    struct quadList *next;
     
 } ;
 
 struct backpatchList
 {
-    struct codeLineEntry *entry;
+    struct quadList *entry;
 
     struct backpatchList *next;
 
@@ -171,12 +171,12 @@ void backpatch(struct backpatchList* list, int gotoL);
 
 struct backpatchList* mergelists(struct backpatchList* a, struct backpatchList* b);
 
-struct backpatchList* addToList(struct backpatchList* list, struct codeLineEntry* entry);
+struct backpatchList* addToList(struct backpatchList* list, struct quadList* entry);
 
 //void generateQuad(char *str);
 //void generateQuad(char name[],char op[10], struct symbolTable *tempList);
 
-struct codeLineEntry *genquad(char *code);
+struct quadList *generateQuad(char *code);
 
 void newTemp(char type[], struct symbolTable **retPtr);
 
