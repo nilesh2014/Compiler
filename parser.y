@@ -28,8 +28,8 @@ int offset = 0;
 struct quadTable quadTableList[10000];
 int quadTableIndex =0;
 
-struct codeLineEntry *codeLines = NULL;
-struct codeLineEntry *codeLineHead = NULL, *codeLineTail = NULL;
+struct quadList *codeLines = NULL;
+struct quadList *codeLineHead = NULL, *codeLineTail = NULL;
 int nextquad=0;    //number of the next quadruple to be generated
 char quadbuffer[50];  //stores the code to be printed in ICG
 
@@ -201,7 +201,7 @@ preprocessor : '#' includet '<' headert '>'  						{;}
 							//insertSymTable("abvg", "onht", NULL,NULL,NULL,  7);
 							//printSymTable();
 							sprintf(quadbuffer, "d_%d := %s", defCount, $4->fixstr);
-							genquad(quadbuffer);
+							generateQuad(quadbuffer);
 						};}
 	;
 
@@ -254,12 +254,12 @@ typeStruct_: typedeft structt id 		{struct structTable *structPtr;
 								//printf("true122222\n");
 								insertStructTableList($3, NULL,NULL, &structPtr);
 								curr_struct_ptr = structPtr;
-								printf("currstruct: %s\n", structPtr->name); 
+								//printf("currstruct: %s\n", structPtr->name); 
 							}
 						}
 	;
 
-member_ : '{'struct_declList '}' id ';' 	{printf("typedef structure part:id %s \n", $4);
+member_ : '{'struct_declList '}' id ';' 	{//printf("typedef structure part:id %s \n", $4);
 						struct structTable *structPtr;
 						if(search_structTypeTable($4, &structPtr)){
 							yyerror("Structure instance already declared");	
@@ -281,8 +281,8 @@ structId_ : structt id				{struct structTable *structPtr;
 							else{
 								insertStructTableList($2, NULL,NULL, &structPtr);
 								curr_struct_ptr = structPtr;
-								printf("currstruct: %s\n", structPtr->name); 
-								printStructTable();
+								//printf("currstruct: %s\n", structPtr->name); 
+								//ctTable();
 							}
 						}
 	;
@@ -301,9 +301,11 @@ member1_ : '{' struct_declList '}' structidList ';' 		{struct variableList *temp
 										temp->next = NULL;
 										//printf("after insert!!!\n");
 										char type[30];
-										strcpy(type, "struct ");
+										sprintf(type, "struct %s",curr_struct_ptr->name);
 										temp->structMemListPtr = curr_struct_ptr->memListPtr;
-										insertSymTable(temp->name,strcat(type,curr_struct_ptr->name) , NULL,temp , 0, &symPtr);
+										strcpy(temp->type,type);
+									//printf("Cuur struct ptrname: %s",curr_struct_ptr->name);
+										insertSymTable(temp->name,type , NULL,temp , 0, &symPtr);
 										
 									}
 									temp = temp1;;
@@ -372,7 +374,7 @@ struct_declList : result_ idList ';'		  		{struct variableList *tempList = $2;
 									
 									
 								}
-								printStructTable();
+								//printStructTable();
 								}
 	;
 
@@ -457,10 +459,19 @@ LHS : func_name arrowopt LHS				{struct variableList *tempL = (struct variableLi
 							//printSymTable();
 							//if(!search_symTable($1,&symPtr)){
 							struct variableList *tempList = $3;
+							int flag = 0;
 							if(!search_var_curr_func($1, &symPtr)){
-								yyerror("variable not declared\n");
+								if(!search_param_curr_func($1,&symPtr)){
+
+									if(!searchGlobal($1,&symPtr)){
+										yyerror("variable not declared\n");
+										flag = 1;
+									}
+								}
+
 							}
-							else{
+							if(flag == 0){
+								//printf("%s\n",symPtr->type);
 								//call_struct_ptr = structPtr;
 								struct variableList *retPtr ;
 								//assert that $3 is a member of symPtr memListPtr
@@ -484,30 +495,30 @@ LHS : func_name arrowopt LHS				{struct variableList *tempL = (struct variableLi
 												sprintf(quadbuffer,"i_%d := %s*%s",intVarCount,arrlist->dim,retlist->dim);
 											else
 												sprintf(quadbuffer,"i_%d := i_%d*%s",intVarCount,prevCount,retlist->dim);
-											genquad(quadbuffer);
+											generateQuad(quadbuffer);
 											prevCount = intVarCount;
 											intVarCount++;
 											arrlist = arrlist->next;
 											sprintf(quadbuffer,"i_%d := i_%d+%s",intVarCount,prevCount,arrlist->dim);
-											genquad(quadbuffer);
+											generateQuad(quadbuffer);
 											prevCount = intVarCount;
 											intVarCount++;
 											retlist = retlist->next;
 											
 										}
 										sprintf(quadbuffer,"i_%d := i_%d*sizeof(%s)",intVarCount,prevCount, retPtr->type);
-										genquad(quadbuffer);
+										generateQuad(quadbuffer);
 										prevCount = intVarCount;
 										intVarCount++;
 									
 										sprintf(quadbuffer,"i_%d := %d + i_%d", intVarCount, retPtr->offset,prevCount);
-										genquad(quadbuffer);
+										generateQuad(quadbuffer);
 										intVarCount++;
 										sprintf(quadbuffer, "i_%d := addr(%s)", intVarCount, $1);
-										genquad(quadbuffer);
+										generateQuad(quadbuffer);
 										//intVarCount++;
 										//sprintf(quadbuffer, "i_%d := i_%d[i_%d]", intVarCount,intVarCount-1,intVarCount-2);
-										//genquad(quadbuffer);
+										//generateQuad(quadbuffer);
 										sprintf(quadbuffer, "i_%d[i_%d]", intVarCount,intVarCount-1 );
 										strcpy(tempL->tempVar, quadbuffer);
 										strcpy(tempL->type, retPtr->type);
@@ -521,10 +532,10 @@ LHS : func_name arrowopt LHS				{struct variableList *tempL = (struct variableLi
 									//printf("ret type:%s\n", retMem->type);
 									
 									sprintf(quadbuffer, "i_%d := addr(%s)", intVarCount, $1);
-									genquad(quadbuffer);
+									generateQuad(quadbuffer);
 									//intVarCount++;
 									//sprintf(quadbuffer, "i_%d := i_%d[%d]",intVarCount, intVarCount-1,retPtr->offset );
-									//genquad(quadbuffer);
+									//generateQuad(quadbuffer);
 									sprintf(quadbuffer, "i_%d[%d]", intVarCount, retPtr->offset);
 									strcpy(tempL->tempVar, quadbuffer);
 									strcpy(tempL->type, retPtr->type);
@@ -663,7 +674,7 @@ callName : func_name '('					{struct symbolTable *symPtr ;
 								else{
 									//printf("%s type\n", call_func_ptr->paramListPtr->type);
 									call_func_ptr = symPtr;
-									//struct codeLineEntry *retCode = 
+									//struct quadList *retCode = 
 									$$ = symPtr;
 									//printf("%s type\n", call_func_ptr->paramListPtr->type);
 																		
@@ -679,7 +690,7 @@ multiParam_ : RHS 						{$$ = 1;
 								else{
 									//ICG
 									sprintf(quadbuffer,"PARAM %s",$1->tempVar);
-									genquad(quadbuffer);
+									generateQuad(quadbuffer);
 								}}
 
 
@@ -689,7 +700,7 @@ multiParam_ : RHS 						{$$ = 1;
 								}else{
 									//ICG
 									sprintf(quadbuffer,"PARAM %s",$3->tempVar);
-									genquad(quadbuffer);
+									generateQuad(quadbuffer);
 								}}
 	
 	
@@ -716,14 +727,14 @@ EXP_ : 	'~' EXP_ 						{if(!strcmp($2->fixstr,"bool") || !strcmp($2->fixstr,"int
 								sprintf(quadbuffer,"i_%d = %s + %s",intVarCount, $1->tempVar, $3->tempVar);
 								sprintf(tempVar, "i_%d", intVarCount);
 								intVarCount++;
-								genquad(quadbuffer);
+								generateQuad(quadbuffer);
 									
 								}
 								else if(!strcmp(temp->fixstr, "float")){
 									sprintf(quadbuffer,"f_%d = %s + %s",floatVarCount, $1->tempVar, $3->tempVar);
 									sprintf(tempVar, "f_%d", floatVarCount);
 									floatVarCount++;
-									genquad(quadbuffer);
+									generateQuad(quadbuffer);
 									
 								}
 								
@@ -745,14 +756,14 @@ EXP_ : 	'~' EXP_ 						{if(!strcmp($2->fixstr,"bool") || !strcmp($2->fixstr,"int
 								sprintf(quadbuffer,"i_%d = %s - %s",intVarCount, $1->tempVar, $3->tempVar);
 								sprintf(tempVar, "i_%d", intVarCount);
 								intVarCount++;
-								genquad(quadbuffer);
+								generateQuad(quadbuffer);
 									
 								}
 								else if(!strcmp(temp->fixstr, "float")){
 									sprintf(quadbuffer,"f_%d = %s - %s",floatVarCount, $1->tempVar, $3->tempVar);
 									sprintf(tempVar, "f_%d", floatVarCount);
 									floatVarCount++;
-									genquad(quadbuffer);
+									generateQuad(quadbuffer);
 									
 								}
 								
@@ -773,7 +784,7 @@ EXP_ : 	'~' EXP_ 						{if(!strcmp($2->fixstr,"bool") || !strcmp($2->fixstr,"int
 								sprintf(quadbuffer,"b_%d = %s %s %s",boolVarCount, $1->tempVar,$2, $3->tempVar);
 								sprintf(tempVar, "b_%d", boolVarCount);
 								boolVarCount++;
-								genquad(quadbuffer);
+								generateQuad(quadbuffer);
 
 								strcpy(temp->tempVar, tempVar);
 								$$ = temp;
@@ -810,14 +821,14 @@ T : F '*' T 						{if(!coercible($1->fixstr,$3->fixstr) || !compatibleArithOp($1
 								sprintf(quadbuffer,"i_%d = %s * %s",intVarCount, $1->tempVar, $3->tempVar);
 								sprintf(tempVar, "i_%d", intVarCount);
 								intVarCount++;
-								genquad(quadbuffer);
+								generateQuad(quadbuffer);
 									
 								}
 								else if(!strcmp(temp->fixstr, "float")){
 									sprintf(quadbuffer,"f_%d = %s * %s",floatVarCount, $1->tempVar, $3->tempVar);
 									sprintf(tempVar, "f_%d", floatVarCount);
 									floatVarCount++;
-									genquad(quadbuffer);
+									generateQuad(quadbuffer);
 									
 								}
 								
@@ -839,14 +850,14 @@ T : F '*' T 						{if(!coercible($1->fixstr,$3->fixstr) || !compatibleArithOp($1
 								sprintf(quadbuffer,"i_%d = %s/%s",intVarCount, $1->tempVar, $3->tempVar);
 								sprintf(tempVar, "i_%d", intVarCount);
 								intVarCount++;
-								genquad(quadbuffer);
+								generateQuad(quadbuffer);
 									
 								}
 								else if(!strcmp(temp->fixstr, "float")){
 									sprintf(quadbuffer,"f_%d = %s/%s",floatVarCount, $1->tempVar, $3->tempVar);
 									sprintf(tempVar, "f_%d", floatVarCount);
 									floatVarCount++;
-									genquad(quadbuffer);
+									generateQuad(quadbuffer);
 									
 								}
 								
@@ -907,27 +918,27 @@ F :  '(' EXP_ ')'  						{$$= $2;}
 											sprintf(quadbuffer,"i_%d := %s*%s",intVarCount,arrlist->dim,retlist->dim);
 											else
 											sprintf(quadbuffer,"i_%d := i_%d*%s",intVarCount,prevCount,retlist->dim);
-											genquad(quadbuffer);
+											generateQuad(quadbuffer);
 											prevCount = intVarCount;
 											intVarCount++;
 											arrlist = arrlist->next;
 											sprintf(quadbuffer,"i_%d := i_%d+%s",intVarCount,prevCount,arrlist->dim);
-											genquad(quadbuffer);
+											generateQuad(quadbuffer);
 											prevCount = intVarCount;
 											intVarCount++;
 											retlist = retlist->next;
 											
 										}
 									sprintf(quadbuffer,"i_%d := i_%d*sizeof(%s)",intVarCount,prevCount, retPtr->type);
-									genquad(quadbuffer);
+									generateQuad(quadbuffer);
 									prevCount = intVarCount;
 									intVarCount++;
 
 									sprintf(quadbuffer,"i_%d := addr(%s)",intVarCount,tempList->name);
-									genquad(quadbuffer);
+									generateQuad(quadbuffer);
  									
 									sprintf(quadbuffer,"i_%d := i_%d[i_%d] ",intVarCount+1,intVarCount,prevCount);
-									genquad(quadbuffer);
+									generateQuad(quadbuffer);
 									sprintf(quadbuffer, "i_%d", intVarCount+1);
 									strcpy(ret->tempVar, quadbuffer);
 									//strcpy(ret->fixstr, retPtr->type);
@@ -949,28 +960,28 @@ F :  '(' EXP_ ')'  						{$$= $2;}
 									sprintf(quadbuffer,"REFPARAM i_%d",intVarCount);
 									sprintf(tempVar, "i_%d", intVarCount);
 									intVarCount++;
-									genquad(quadbuffer);
+									generateQuad(quadbuffer);
 									
 								}
 								else if(!strcmp(temp->type, "float")){
 									sprintf(quadbuffer,"REFPARAM f_%d",floatVarCount);
 									sprintf(tempVar, "f_%d", floatVarCount);
 									floatVarCount++;
-									genquad(quadbuffer);
+									generateQuad(quadbuffer);
 									
 								}
 								else if(!strcmp(temp->type, "char")){
 									sprintf(quadbuffer,"REFPARAM c_%d",charVarCount);
 									sprintf(tempVar, "c_%d", charVarCount);
 									charVarCount++;
-									genquad(quadbuffer);
+									generateQuad(quadbuffer);
 									
 								}
 								else if(!strcmp(temp->type, "bool")){
 									sprintf(quadbuffer,"REFPARAM b_%d",boolVarCount);
 									sprintf(tempVar, "b_%d", boolVarCount);
 									boolVarCount++;
-									genquad(quadbuffer);
+									generateQuad(quadbuffer);
 									
 								}
 								else if(!strcmp(temp->type, "void")){
@@ -980,18 +991,18 @@ F :  '(' EXP_ ')'  						{$$= $2;}
 									sprintf(quadbuffer,"REFPARAM s_%d",structVarCount);
 									sprintf(tempVar, "s_%d", structVarCount);
 									structVarCount++;
-									genquad(quadbuffer);
+									generateQuad(quadbuffer);
 
 									
 								}
 								
 								if(!strcmp(temp->type, "void")){
 									sprintf(quadbuffer,"CALL %s, %d",temp->name,temp->num_param);
-									genquad(quadbuffer);
+									generateQuad(quadbuffer);
 								}
 								else{
 									sprintf(quadbuffer,"CALL %s, %d",temp->name,temp->num_param+1);
-									genquad(quadbuffer);
+									generateQuad(quadbuffer);
 								}
 								struct nonTstruct *tempN  = (struct nonTstruct *)malloc(sizeof(struct nonTstruct));
 								strcpy(tempN->tempVar, tempVar);
@@ -1021,13 +1032,13 @@ func_proto:	func_head ';'					{curr_func_ptr = NULL;level = 0;$$.nextList = NULL
 func_def : func_head '{' '}'					{//delete_content(level);   //need to know what it does.
 								curr_func_ptr = NULL;level =0;
 								$$.nextList = NULL;
-								genquad("FUNC END");}
+								generateQuad("FUNC END");}
 
 	| func_head '{' stmtList_ '}' 				{//delete_content(level);
 								
 								curr_func_ptr = NULL;level =0;
 								$$.nextList = $3.nextList;
-								genquad("FUNC END");}
+								generateQuad("FUNC END");}
 	;
 
 func_head : resId '(' declPlist ')' 				{level =2;
@@ -1052,7 +1063,7 @@ resId : result_ func_name					{struct symbolTable *symPtr;//= (struct symbolTabl
 									sprintf(quadbuffer,"FUNC BEGIN %s",$2);
 									//printf("%s\n", symTable[0].name);
 									//printf("func head correct!!!\n") ;
-									genquad(quadbuffer);
+									generateQuad(quadbuffer);
 								}level = 1;}
 	;
 
@@ -1071,7 +1082,7 @@ var_declList : result_ idList   				{struct variableList *tempList = $2;
 										strcpy(tempList->type, $1);
 										
 										insertSymTable(tempList->name,$1 , NULL,tempList,  0,&symPtr);				
-										printSymTable();
+										//printSymTable();
 								
 									}
 									
@@ -1092,7 +1103,7 @@ return_ : returnt RHS 						{struct symbolTable *ret = curr_func_ptr;
 								
 													
             							sprintf(quadbuffer,"RETURN %s",$2->tempVar);
-								genquad(quadbuffer);				
+								generateQuad(quadbuffer);				
 								}}
 
 	| returnt 						{struct symbolTable *ret = curr_func_ptr;
@@ -1102,7 +1113,7 @@ return_ : returnt RHS 						{struct symbolTable *ret = curr_func_ptr;
 								else{
 								$$.nextList = NULL;
 	    							sprintf(quadbuffer,"RETURN");
-								genquad(quadbuffer);
+								generateQuad(quadbuffer);
 								}
 								}
 	;
@@ -1156,7 +1167,7 @@ assignment : LHS '=' RHS 				{struct variableList *tempList = $1;
 								}
 								if(flag == 0){	
 									sprintf(quadbuffer, "%s = %s", tempList->tempVar, $3->tempVar);
-									genquad(quadbuffer);
+									generateQuad(quadbuffer);
 								}	
 							}else{
 							//printf("assgn: %s \n", tempR->type );
@@ -1184,7 +1195,7 @@ assignment : LHS '=' RHS 				{struct variableList *tempList = $1;
 									/*//ICG
 									else if(strcmp($3->tempVar , "void")){
 										sprintf(quadbuffer,"%s := %s",$1->name,$3->tempVar);
-										genquad(quadbuffer);
+										generateQuad(quadbuffer);
 									}*/
 								}		
 							}
@@ -1209,27 +1220,27 @@ assignment : LHS '=' RHS 				{struct variableList *tempList = $1;
 											sprintf(quadbuffer,"i_%d := %s*%s",intVarCount,arrlist->dim,retlist->dim);
 											else
 											sprintf(quadbuffer,"i_%d := i_%d*%s",intVarCount,prevCount,retlist->dim);
-											genquad(quadbuffer);
+											generateQuad(quadbuffer);
 											prevCount = intVarCount;
 											intVarCount++;
 											arrlist = arrlist->next;
 											sprintf(quadbuffer,"i_%d := i_%d+%s",intVarCount,prevCount,arrlist->dim);
-											genquad(quadbuffer);
+											generateQuad(quadbuffer);
 											prevCount = intVarCount;
 											intVarCount++;
 											retlist = retlist->next;
 											
 										}
 									sprintf(quadbuffer,"i_%d := i_%d*sizeof(%s)",intVarCount,prevCount, retPtr->type);
-									genquad(quadbuffer);
+									generateQuad(quadbuffer);
 									prevCount = intVarCount;
 									intVarCount++;
 
 									sprintf(quadbuffer,"i_%d := addr(%s)",intVarCount,tempList->name);
-									genquad(quadbuffer);
+									generateQuad(quadbuffer);
  									
 									sprintf(quadbuffer,"i_%d[i_%d] := %s",intVarCount,prevCount,$3->tempVar);
-									genquad(quadbuffer);
+									generateQuad(quadbuffer);
 									intVarCount++;
 									
 									
@@ -1238,7 +1249,7 @@ assignment : LHS '=' RHS 				{struct variableList *tempList = $1;
 								else if(!strcmp(tempList->arraytype, "simple")){
 									if(strcmp($3->tempVar , "void")){
 										sprintf(quadbuffer,"%s := %s",$1->name,$3->tempVar);
-										genquad(quadbuffer);
+										generateQuad(quadbuffer);
 									}
 								}	
 							}}}								
@@ -1256,7 +1267,7 @@ assignment : LHS '=' RHS 				{struct variableList *tempList = $1;
 								}
 								if(flag == 0){	
 									sprintf(quadbuffer, "%s = %s + %s", tempList->tempVar,tempList->tempVar, $3->tempVar);
-									genquad(quadbuffer);
+									generateQuad(quadbuffer);
 								}	
 							}else{
 							//printf("assgn: %s \n", tempR->type );
@@ -1284,7 +1295,7 @@ assignment : LHS '=' RHS 				{struct variableList *tempList = $1;
 									/*//ICG
 									else if(strcmp($3->tempVar , "void")){
 										sprintf(quadbuffer,"%s := %s",$1->name,$3->tempVar);
-										genquad(quadbuffer);
+										generateQuad(quadbuffer);
 									}*/
 								}		
 							}
@@ -1310,29 +1321,29 @@ assignment : LHS '=' RHS 				{struct variableList *tempList = $1;
 											sprintf(quadbuffer,"i_%d := %s*%s",intVarCount,arrlist->dim,retlist->dim);
 											else
 											sprintf(quadbuffer,"i_%d := i_%d*%s",intVarCount,prevCount,retlist->dim);
-											genquad(quadbuffer);
+											generateQuad(quadbuffer);
 											prevCount = intVarCount;
 											intVarCount++;
 											arrlist = arrlist->next;
 											sprintf(quadbuffer,"i_%d := i_%d+%s",intVarCount,prevCount,arrlist->dim);
-											genquad(quadbuffer);
+											generateQuad(quadbuffer);
 											prevCount = intVarCount;
 											intVarCount++;
 											retlist = retlist->next;
 											
 										}
 									sprintf(quadbuffer,"i_%d := i_%d*sizeof(%s)",intVarCount,prevCount, retPtr->type);
-									genquad(quadbuffer);
+									generateQuad(quadbuffer);
 									prevCount = intVarCount;
 									intVarCount++;
 
 									sprintf(quadbuffer,"i_%d := addr(%s)",intVarCount,tempList->name);
-									genquad(quadbuffer);
+									generateQuad(quadbuffer);
  									sprintf(quadbuffer, "i_%d := i_%d[i_%d]", intVarCount + 1,intVarCount,prevCount);
-									genquad(quadbuffer);
+									generateQuad(quadbuffer);
 									intVarCount++;
 									sprintf(quadbuffer,"i_%d := i_%d + %s",intVarCount,intVarCount,$3->tempVar);
-									genquad(quadbuffer);
+									generateQuad(quadbuffer);
 									intVarCount++;
 									
 									
@@ -1341,7 +1352,7 @@ assignment : LHS '=' RHS 				{struct variableList *tempList = $1;
 								else if(!strcmp(tempList->arraytype, "simple")){
 									if(strcmp($3->tempVar , "void")){
 										sprintf(quadbuffer,"%s := %s + %s",$1->name,$1->name ,$3->tempVar);
-										genquad(quadbuffer);
+										generateQuad(quadbuffer);
 									}
 								}
 									
@@ -1358,7 +1369,7 @@ assignment : LHS '=' RHS 				{struct variableList *tempList = $1;
 								}
 								if(flag == 0){	
 									sprintf(quadbuffer, "%s = %s - %s", tempList->tempVar,tempList->tempVar, $3->tempVar);
-									genquad(quadbuffer);
+									generateQuad(quadbuffer);
 								}	
 									
 							}else{
@@ -1387,7 +1398,7 @@ assignment : LHS '=' RHS 				{struct variableList *tempList = $1;
 									/*//ICG
 									else if(strcmp($3->tempVar , "void")){
 										sprintf(quadbuffer,"%s := %s",$1->name,$3->tempVar);
-										genquad(quadbuffer);
+										generateQuad(quadbuffer);
 									}*/
 								}		
 							}
@@ -1412,30 +1423,30 @@ assignment : LHS '=' RHS 				{struct variableList *tempList = $1;
 											sprintf(quadbuffer,"i_%d := %s*%s",intVarCount,arrlist->dim,retlist->dim);
 											else
 											sprintf(quadbuffer,"i_%d := i_%d*%s",intVarCount,prevCount,retlist->dim);
-											genquad(quadbuffer);
+											generateQuad(quadbuffer);
 											prevCount = intVarCount;
 											intVarCount++;
 											arrlist = arrlist->next;
 											sprintf(quadbuffer,"i_%d := i_%d+%s",intVarCount,prevCount,arrlist->dim);
-											genquad(quadbuffer);
+											generateQuad(quadbuffer);
 											prevCount = intVarCount;
 											intVarCount++;
 											retlist = retlist->next;
 											
 										}
 									sprintf(quadbuffer,"i_%d := i_%d*sizeof(%s)",intVarCount,prevCount, retPtr->type);
-									genquad(quadbuffer);
+									generateQuad(quadbuffer);
 									prevCount = intVarCount;
 									intVarCount++;
 
 									sprintf(quadbuffer,"i_%d := addr(%s)",intVarCount,tempList->name);
-									genquad(quadbuffer);
+									generateQuad(quadbuffer);
  									
 									sprintf(quadbuffer, "i_%d := i_%d[i_%d]", intVarCount + 1,intVarCount,prevCount);
-									genquad(quadbuffer);
+									generateQuad(quadbuffer);
 									intVarCount++;
 									sprintf(quadbuffer,"i_%d := i_%d - %s",intVarCount,intVarCount,$3->tempVar);
-									genquad(quadbuffer);
+									generateQuad(quadbuffer);
 									intVarCount++;
 									
 									
@@ -1444,7 +1455,7 @@ assignment : LHS '=' RHS 				{struct variableList *tempList = $1;
 								else if(!strcmp(tempList->arraytype, "simple")){
 									if(strcmp($3->tempVar , "void")){
 										sprintf(quadbuffer,"%s := %s - %s",$1->name,$1->name ,$3->tempVar);
-										genquad(quadbuffer);
+										generateQuad(quadbuffer);
 									}
 								}
 									
@@ -1455,7 +1466,7 @@ assignment : LHS '=' RHS 				{struct variableList *tempList = $1;
 							//struct symbolTable *tempR = $3;
 							if(!strcmp(tempList->arraytype, "struct")){
 									sprintf(quadbuffer, "%s = %s + 1", tempList->tempVar,tempList->tempVar);
-									genquad(quadbuffer);
+									generateQuad(quadbuffer);
 									
 							}else{
 							//printf("assgn: %s \n", tempR->type );
@@ -1493,30 +1504,30 @@ assignment : LHS '=' RHS 				{struct variableList *tempList = $1;
 											sprintf(quadbuffer,"i_%d := %s*%s",intVarCount,arrlist->dim,retlist->dim);
 											else
 											sprintf(quadbuffer,"i_%d := i_%d*%s",intVarCount,prevCount,retlist->dim);
-											genquad(quadbuffer);
+											generateQuad(quadbuffer);
 											prevCount = intVarCount;
 											intVarCount++;
 											arrlist = arrlist->next;
 											sprintf(quadbuffer,"i_%d := i_%d+%s",intVarCount,prevCount,arrlist->dim);
-											genquad(quadbuffer);
+											generateQuad(quadbuffer);
 											prevCount = intVarCount;
 											intVarCount++;
 											retlist = retlist->next;
 											
 										}
 									sprintf(quadbuffer,"i_%d := i_%d*sizeof(%s)",intVarCount,prevCount, retPtr->type);
-									genquad(quadbuffer);
+									generateQuad(quadbuffer);
 									prevCount = intVarCount;
 									intVarCount++;
 
 									sprintf(quadbuffer,"i_%d := addr(%s)",intVarCount,tempList->name);
-									genquad(quadbuffer);
+									generateQuad(quadbuffer);
  									
 									sprintf(quadbuffer, "i_%d := i_%d[i_%d]", intVarCount + 1,intVarCount,prevCount);
-									genquad(quadbuffer);
+									generateQuad(quadbuffer);
 									intVarCount++;
 									sprintf(quadbuffer,"i_%d := i_%d + 1",intVarCount,intVarCount);
-									genquad(quadbuffer);
+									generateQuad(quadbuffer);
 									intVarCount++;
 									
 									
@@ -1525,7 +1536,7 @@ assignment : LHS '=' RHS 				{struct variableList *tempList = $1;
 								else if(!strcmp(retPtr->arraytype, "simple")){
 									
 										sprintf(quadbuffer,"%s := %s + 1",$1->name,$1->name);
-										genquad(quadbuffer);
+										generateQuad(quadbuffer);
 								}
 									
 							}}}
@@ -1535,7 +1546,7 @@ assignment : LHS '=' RHS 				{struct variableList *tempList = $1;
 							//struct symbolTable *tempR = $3;
 							if(!strcmp(tempList->arraytype, "struct")){
 									sprintf(quadbuffer, "%s = %s - 1", tempList->tempVar,tempList->tempVar);
-									genquad(quadbuffer);
+									generateQuad(quadbuffer);
 									
 							}else{
 							//printf("assgn: %s \n", tempR->type );
@@ -1572,30 +1583,30 @@ assignment : LHS '=' RHS 				{struct variableList *tempList = $1;
 											sprintf(quadbuffer,"i_%d := %s*%s",intVarCount,arrlist->dim,retlist->dim);
 											else
 											sprintf(quadbuffer,"i_%d := i_%d*%s",intVarCount,prevCount,retlist->dim);
-											genquad(quadbuffer);
+											generateQuad(quadbuffer);
 											prevCount = intVarCount;
 											intVarCount++;
 											arrlist = arrlist->next;
 											sprintf(quadbuffer,"i_%d := i_%d+%s",intVarCount,prevCount,arrlist->dim);
-											genquad(quadbuffer);
+											generateQuad(quadbuffer);
 											prevCount = intVarCount;
 											intVarCount++;
 											retlist = retlist->next;
 											
 										}
 									sprintf(quadbuffer,"i_%d := i_%d*sizeof(%s)",intVarCount,prevCount, retPtr->type);
-									genquad(quadbuffer);
+									generateQuad(quadbuffer);
 									prevCount = intVarCount;
 									intVarCount++;
 
 									sprintf(quadbuffer,"i_%d := addr(%s)",intVarCount,tempList->name);
-									genquad(quadbuffer);
+									generateQuad(quadbuffer);
  									
 									sprintf(quadbuffer, "i_%d := i_%d[i_%d]", intVarCount + 1,intVarCount,prevCount);
-									genquad(quadbuffer);
+									generateQuad(quadbuffer);
 									intVarCount++;
 									sprintf(quadbuffer,"i_%d := i_%d - 1",intVarCount,intVarCount);
-									genquad(quadbuffer);
+									generateQuad(quadbuffer);
 									intVarCount++;
 									
 									
@@ -1604,7 +1615,7 @@ assignment : LHS '=' RHS 				{struct variableList *tempList = $1;
 								else if(!strcmp(tempList->arraytype, "simple")){
 									
 										sprintf(quadbuffer,"%s := %s - 1",$1->name,$1->name);
-										genquad(quadbuffer);
+										generateQuad(quadbuffer);
 								}
 									
 							}}}
@@ -1670,19 +1681,19 @@ ifExp_	: ift  '(' expression ')'				{//struct symbolTable *tempR = $3;
 								}
 								else{
 									sprintf(quadbuffer,"IF (%s<=0) GOTO",$3.tempVar);
-									$$.falseList = addToList(NULL, genquad(quadbuffer));
+									$$.falseList = addToList(NULL, generateQuad(quadbuffer));
 	    								//sprintf(quadBuffer,"GOTO");
-									//$$.trueList = addToList(NULL, genquad(quadBuffer));
+									//$$.trueList = addToList(NULL, generateQuad(quadBuffer));
 								}}
 	;
 
 while_ : whileExp_  dot  body_  				{sprintf(quadbuffer,"GOTO %d",$1.begin);
-								genquad(quadbuffer);
+								generateQuad(quadbuffer);
 								backpatch($3.nextList, $1.begin); 
 								$$.nextList = $1.falseList;}
 
 	|  whileExp_  body_ 					{sprintf(quadbuffer,"GOTO %d",$1.begin);
-								genquad(quadbuffer);
+								generateQuad(quadbuffer);
 								backpatch($2.nextList, $1.begin); 
 								$$.nextList = $1.falseList;
 								}
@@ -1694,7 +1705,7 @@ whileExp_: whilet marker '(' expression ')'			{//struct symbolTable *tempR = $3;
 								}
 								else{
 									sprintf(quadbuffer,"IF (%s<=0) GOTO",$4.tempVar);
-									$$.falseList = addToList(NULL, genquad(quadbuffer));
+									$$.falseList = addToList(NULL, generateQuad(quadbuffer));
 									$$.begin = $2.quad;
 									//backpatch($$.trueList, $2.quad);
 									//printf("value of quad: %d\n", $2.quad); 
@@ -1722,7 +1733,7 @@ for_ : fort  '(' assignment ';' marker expr_ jump_marker ';' marker assignment j
 	;
 
 expr_	: marker expression					{sprintf(quadbuffer,"IF (%s<=0) GOTO",$2.tempVar);
-								$$.falseList = addToList(NULL, genquad(quadbuffer));
+								$$.falseList = addToList(NULL, generateQuad(quadbuffer));
 								$$.begin = $1.quad;strcpy($$.type, $2.type);}
 	;
 
@@ -1731,7 +1742,7 @@ marker	:							{$$.quad = nextquad+1; }
 
 jump_marker:							{//$$.quad = nextquad+1;
 								sprintf(quadbuffer,"GOTO");
-								$$.nextList = addToList(NULL, genquad(quadbuffer));}
+								$$.nextList = addToList(NULL, generateQuad(quadbuffer));}
 	;
 
 %%
@@ -1817,8 +1828,8 @@ void writeSymTable(FILE *fp){
 		yyerror("error in write");
 		return;
 	}
-	fprintf(fp, "%-5s%-20s%-20s%-80s%-5s\n","SI", "Name", "Type","ParamList","No. Of Param" );
-	fprintf(fp, "--------------------------------------------------------------\n");
+	fprintf(fp, "%-5s%-20s%-20s%-60s%-5s\n","SI", "Name", "Type","ParamList","No. Of Param" );
+	fprintf(fp, "----------------------------------------------------------------------------\n");
 	for(i=0;i<symTableIndex;i++){
 		fprintf(fp, "%-5d%-20s%-20s",num++,symTable[i].name,symTable[i].type);
 		struct variableList *temp = symTable[i].paramListPtr;
@@ -2349,15 +2360,15 @@ void generateQuad(char name[],char op[10], struct symbolTable *tempList){
 
 
 //returns current code line
-struct codeLineEntry *genquad(char *code){
-	//printf("In genquad\n");
+struct quadList *generateQuad(char *code){
+	//printf("In generateQuad\n");
 	//fflush(stdout);
 	nextquad++;
 	printf("%d %s\n",nextquad,code);
 	//Create the element
-	struct codeLineEntry* newCodeLine = (struct codeLineEntry *)malloc(sizeof(struct codeLineEntry));
+	struct quadList* newCodeLine = (struct quadList *)malloc(sizeof(struct quadList));
 	strcpy(newCodeLine->code, code);
-	//printf("genquad func!!\n");
+	//printf("generateQuad func!!\n");
 	newCodeLine->next = NULL;
 	newCodeLine->gotoL = -1;
 	
@@ -2398,7 +2409,7 @@ struct backpatchList* mergelists(struct backpatchList* a, struct backpatchList* 
 	}
 }
 
-struct backpatchList* addToList(struct backpatchList* list, struct codeLineEntry* entry){
+struct backpatchList* addToList(struct backpatchList* list, struct quadList* entry){
 	//printf("In addToList\n");
 	//fflush(stdout);
 	if(entry == NULL){
@@ -2425,7 +2436,7 @@ struct backpatchList* addToList(struct backpatchList* list, struct codeLineEntry
 
 bool writeICG(FILE *fp)
 {
-    struct codeLineEntry *codeLine = codeLineHead;
+    struct quadList *codeLine = codeLineHead;
 
     if(codeLine == NULL)
     {
