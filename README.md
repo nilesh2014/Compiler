@@ -1,2 +1,2 @@
 # Compiler
-Compiler fro C like language
+Compiler for C like language
